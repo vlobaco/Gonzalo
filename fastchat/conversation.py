@@ -19,10 +19,6 @@ class SeparatorStyle(Enum):
     RWKV = auto()
     PHOENIX = auto()
 
-from  fastchat.serve.promptGenerator import PromptGenerator
-promp_generator = PromptGenerator(knowledge_dir='fastchat/serve/documents', k=3)
-
-
 @dataclasses.dataclass
 class Conversation:
     """A class that keeps all conversation history."""
@@ -65,10 +61,7 @@ class Conversation:
                     ret += message + seps[i % 2]
                 else:
                     ret += role + ":"
-            if len(self.messages) > 1:
-                prompt, log = promp_generator.get_prompt(ret)
-                ret = prompt + "\n" + self.system + "\nResponde la pregunta en el contexto de las Fuerzas Armadas españolas, y utilizando únicamente el contexto proporcionado." + seps[0] + ret
-            return ret, log
+            return ret
         elif self.sep_style == SeparatorStyle.ADD_COLON_SPACE_SINGLE:
             ret = self.system + self.sep
             for role, message in self.messages:

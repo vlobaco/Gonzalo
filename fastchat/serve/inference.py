@@ -44,12 +44,23 @@ def partial_stop(output, stop_str):
             return True
     return False
 
+import datetime
+import json
+from  fastchat.serve.promptGenerator import PromptGenerator
+promp_generator = PromptGenerator(knowledge_dir='fastchat/serve/documents', k=3)
 
 @torch.inference_mode()
 def generate_stream(
     model, tokenizer, params, device, context_len=2048, stream_interval=2
 ):
+    #Adding context to the prompt
     prompt = params["prompt"]
+    context, log = promp_generator.get_prompt(prompt)
+    prompt = context + "\n" \
+        + "Una conversación entre un militar español y un asistente virtual artificial. " \
+        + "El asistente da respuestas a la pregunta del militar que son útiles, detalladas y educadas. " \
+        + "El asistente responde la pregunta en el contexto de las Fuerzas Armadas españolas, y utilizando únicamente el contexto proporcionado. " \
+        + prompt
     len_prompt = len(prompt)
     temperature = float(params.get("temperature", 1.0))
     repetition_penalty = float(params.get("repetition_penalty", 1.0))
@@ -204,7 +215,11 @@ def generate_stream(
         finish_reason = "stop"
     else:
         finish_reason = None
-
+    log['response'] = output
+    now=datetime.datetime.now()
+    log['date']=now.strftime("%d/%m/%Y %H:%M:%S")
+    with open(f'{now.strftime("%Y-%m-%d")}-req.json', 'a', encoding='utf-8') as f:
+        json.dump(log, f, ensure_ascii=False, )
     yield {
         "text": output,
         "usage": {

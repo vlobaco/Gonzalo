@@ -352,7 +352,7 @@ def http_bot(state, temperature, top_p, max_new_tokens, request: gr.Request):
         if "chatglm" in model_name:
             prompt = list(list(x) for x in conv.messages[conv.offset :])
         else:
-            prompt, log = conv.get_prompt()
+            prompt = conv.get_prompt()
 
         # Construct repetition_penalty
         if "t5" in model_name:
@@ -426,10 +426,6 @@ def http_bot(state, temperature, top_p, max_new_tokens, request: gr.Request):
 
     finish_tstamp = time.time()
     logger.info(f"{output}")
-    log['response'] = output
-    log['date']=start_tstamp
-    with open('activity_log.json', 'a') as f:
-        f.write(json.dumps(log)+'\n')
     with open(get_conv_log_filename(), "a") as fout:
         data = {
             "tstamp": round(finish_tstamp, 4),

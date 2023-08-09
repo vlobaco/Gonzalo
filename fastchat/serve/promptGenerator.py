@@ -25,7 +25,7 @@ class PromptGenerator:
         print('Loading embeddings...')
         self.embeddings=HuggingFaceEmbeddings(model_name='hiiamsid/sentence_similarity_spanish_es')
         print(f'Loading txt documents from {self.knowledge_dir}')
-        loader =DirectoryLoader(self.knowledge_dir, show_progress=True, use_multithreading=True, glob='*.txt', loader_cls=TextLoader)
+        loader =DirectoryLoader(self.knowledge_dir, show_progress=True, use_multithreading=True, glob='*.txt', loader_cls=TextLoader, loader_kwargs={'encoding': 'utf-8'},)
         data = loader.load()
         print(f'Splitting {len(data)} documents...')
         documents = []
@@ -53,8 +53,8 @@ class PromptGenerator:
             }
         for index, i in enumerate(top_k_indices):
             log[f'context_text_{index}'] = docs[i][0].page_content
-            log[f'context_similarity_{index}'] = docs[i][1]
-            log[f'relevance_{index}'] = scores[i]
+            log[f'context_similarity_{index}'] = float(docs[i][1])
+            log[f'relevance_{index}'] = float(scores[i])
         context_docs = [docs[i][0].page_content for i in top_k_indices]
         if len(context_docs) == 0:
             prompt = ''
