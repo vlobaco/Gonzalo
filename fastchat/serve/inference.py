@@ -7,18 +7,8 @@ import sys
 import warnings
 import pickle
 
-import psutil
 import torch
-from transformers import (
-    AutoTokenizer,
-    AutoModelForCausalLM,
-    LlamaTokenizer,
-    LlamaForCausalLM,
-    AutoModel,
-    AutoModelForSeq2SeqLM,
-    T5Tokenizer,
-    AutoConfig,
-)
+
 from transformers.generation.logits_process import (
     LogitsProcessorList,
     RepetitionPenaltyLogitsProcessor,
@@ -259,6 +249,7 @@ def chat_loop(
     chatio: ChatIO,
     debug: bool,
 ):
+
     # Model
     print("Loading model...")
     model, tokenizer = load_model(
@@ -294,7 +285,7 @@ def chat_loop(
             prompt = conv.messages[conv.offset :]
         else:
             generate_stream_func = generate_stream
-            prompt = conv.get_prompt()
+            log, prompt = conv.get_prompt()
 
         gen_params = {
             "model": model_path,
@@ -310,7 +301,8 @@ def chat_loop(
         chatio.prompt_for_output(conv.roles[1])
         output_stream = generate_stream_func(model, tokenizer, gen_params, device)
         outputs = chatio.stream_output(output_stream)
-        conv.update_last_message(outputs.strip())
+        response = outputs.strip()
+        conv.update_last_message(response)
 
         if debug:
             print("\n", {"prompt": prompt, "outputs": outputs}, "\n")

@@ -68,9 +68,6 @@ class CacheFlowWorker:
             model_path = model_path[:-1]
         self.model_name = model_name or model_path.split("/")[-1]
 
-        logger.info(f"Loading the model {self.model_name} on worker {worker_id} ...")
-        self.block_size = block_size
-
         # FIXME(Hao): we need to pass the tokenizer into cacheflow because we need
         # to detect the stopping criteria "###".
         self.tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=False)
