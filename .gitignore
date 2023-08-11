@@ -22,6 +22,7 @@ output
 # Data
 *.pkl
 *.csv
+.chroma
 
 # Build
 build
