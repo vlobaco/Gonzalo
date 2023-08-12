@@ -217,7 +217,7 @@ def generate_stream(
         finish_reason = None
     log['response'] = output
     now=datetime.datetime.now()
-    log['date']=now.strftime("%d/%m/%Y %H:%M:%S")
+    log['date']=now.strftime("%y/%m/%d %H:%M:%S")
     with open(f'{now.strftime("%Y-%m-%d")}-req.json', 'a', encoding='utf-8') as f:
         f.write(json.dumps(log, ensure_ascii=False)+'\n')
     yield {
