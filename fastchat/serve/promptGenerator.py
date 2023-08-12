@@ -1,8 +1,10 @@
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.vectorstores import Chroma
 from langchain.document_loaders import DirectoryLoader, TextLoader
+from langchain.docstore.document import Document
 from sentence_transformers.cross_encoder import CrossEncoder
 
+import json
 import numpy as np
 import re
 
@@ -29,15 +31,26 @@ class PromptGenerator:
         data = loader.load()
         print(f'Splitting {len(data)} documents...')
         documents = []
+        index = 0
         for d in data:
             print(f'Processing {d.metadata["source"]}')
-            d = d.page_content
-            paragraphs = re.split('\n\n', d)
-            documents += paragraphs
-        self.n_documents = len(documents)
-        print(f'Found {self.n_documents} txt documents')
+            paragraphs = re.split('\n\n', d.page_content)
+            for paragraph in paragraphs:
+                documents += [Document(page_content=paragraph, metadata={'index': str(index)})]
+                index += 1
+        self.n_documents = index
+        print(f'Found {index} documents')
         print('Creating vector store...')
-        self.docsearch = Chroma.from_texts(documents, self.embeddings)
+        self.docsearch = Chroma.from_documents(documents, self.embeddings, ids=[str(index) for index in range(self.n_documents)])
+        print('Saving documents...')
+        with open('documents.txt', 'w', encoding='utf-8') as f:
+            for document in documents:
+                index = document.metadata['index']
+                f.write(json.dumps({
+                    'index': index,
+                    'page_content': document.page_content,
+                    'embedding': self.docsearch.get(index, include=['embeddings'])['embeddings'][0],
+                }) + '\n')
 
     def get_prompt(self, question):
         question_vector = self.embeddings.embed_query(question)
@@ -50,11 +63,9 @@ class PromptGenerator:
         log = {
             'text': question,
             'text_vector': question_vector,
+            'top_k_indices': [doc[0].metadata['index'] for doc in docs[top_k_indices]],
+            'top_k_scores': scores[top_k_indices].tolist(),
             }
-        for index, i in enumerate(top_k_indices):
-            log[f'context_text_{index}'] = docs[i][0].page_content
-            log[f'context_similarity_{index}'] = float(docs[i][1])
-            log[f'relevance_{index}'] = float(scores[i])
         context_docs = [docs[i][0].page_content for i in top_k_indices]
         if len(context_docs) == 0:
             prompt = ''
