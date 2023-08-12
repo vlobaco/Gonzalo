@@ -180,6 +180,12 @@ def vote_last_response(state, vote_type, model_selector, request: gr.Request):
             "ip": request.client.host,
         }
         fout.write(json.dumps(data) + "\n")
+    with open(f'{datetime.datetime.now().strftime("%Y-%m-%d")}-req.json', 'a', encoding='utf-8') as f:
+        data = {
+            "ip": request.client.host,
+            "feedback": (1 if vote_type=="upvote" else -1),
+        }
+        f.write(json.dumps(data, ensure_ascii=False)+'\n')
 
 
 def upvote_last_response(state, model_selector, request: gr.Request):
@@ -377,6 +383,11 @@ def http_bot(state, temperature, top_p, max_new_tokens, request: gr.Request):
         for data in stream_iter:
             if data["error_code"] == 0:
                 output = data["text"].strip()
+                if "req_log" in data:
+                    log = data["req_log"]
+                    log['ip'] = request.client.host
+                    with open(f'{datetime.datetime.now().strftime("%Y-%m-%d")}-req.json', 'a', encoding='utf-8') as f:
+                         f.write(json.dumps(log, ensure_ascii=False)+'\n')
                 if "vicuna" in model_name:
                     output = post_process_code(output)
                 conv.update_last_message(output + "▌")
