@@ -1,11 +1,7 @@
 """Inference for FastChat models."""
 import abc
 import gc
-import math
 from typing import Iterable, Optional
-import sys
-import warnings
-import pickle
 
 import torch
 
@@ -45,9 +41,8 @@ def partial_stop(output, stop_str):
     return False
 
 import datetime
-import json
 from  fastchat.serve.promptGenerator import PromptGenerator
-promp_generator = PromptGenerator(knowledge_dir='fastchat/serve/documents', k=3)
+promp_generator = PromptGenerator(k=3)
 
 @torch.inference_mode()
 def generate_stream(

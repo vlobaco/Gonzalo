@@ -31,3 +31,4 @@ build
 fastchat/serve/documents/*
 fastchat/serve/promptGenerator.py
 documents.txt
+.knowledge

@@ -3,12 +3,10 @@ A model worker executes the model.
 """
 import argparse
 import asyncio
-import dataclasses
-import logging
 import json
 import os
+import re
 import time
-from typing import List, Union
 import threading
 import uuid
 
@@ -34,11 +32,15 @@ import torch
 import torch.nn.functional as F
 import uvicorn
 
+from chromadb.config import Settings
 from fastchat.constants import WORKER_HEART_BEAT_INTERVAL, ErrorCode, SERVER_ERROR_MSG
 from fastchat.model.model_adapter import load_model, add_model_args
 from fastchat.model.chatglm_model import chatglm_generate_stream
-from fastchat.serve.inference import generate_stream
 from fastchat.utils import build_logger, pretty_print_semaphore
+from langchain.document_loaders import DirectoryLoader, TextLoader
+from langchain.docstore.document import Document
+from langchain.embeddings import HuggingFaceEmbeddings
+from langchain.vectorstores import Chroma
 
 GB = 1 << 30
 
@@ -47,7 +49,7 @@ logger = build_logger("model_worker", f"model_worker_{worker_id}.log")
 global_counter = 0
 
 model_semaphore = None
-
+knowledge_persistence = './.knowledge'
 
 def heart_beat_worker(controller):
     while True:
@@ -69,6 +71,8 @@ class ModelWorker:
         max_gpu_memory,
         load_8bit=False,
         cpu_offloading=False,
+        read_knowledge=False, 
+        knowledge_dir = 'fastchat/serve/documents',
     ):
         self.controller_addr = controller_addr
         self.worker_addr = worker_addr
@@ -77,6 +81,41 @@ class ModelWorker:
             model_path = model_path[:-1]
         self.model_name = model_name or model_path.split("/")[-1]
         self.device = device
+
+        if not read_knowledge:
+            print(f'Loading txt documents from {knowledge_dir}')
+            loader =DirectoryLoader(knowledge_dir, show_progress=True, use_multithreading=True, glob='*.txt', loader_cls=TextLoader, loader_kwargs={'encoding': 'utf-8'},)
+            data = loader.load()
+            print(f'Splitting {len(data)} documents...')
+            documents = []
+            index = 0
+            for d in data:
+                print(f'Processing {d.metadata["source"]}')
+                paragraphs = re.split('\n\n', d.page_content)
+                for paragraph in paragraphs:
+                    documents += [Document(page_content=paragraph, metadata={'index': str(index)})]
+                    index += 1
+            print(f'Found {index} documents')
+            print('Creating vector store...')
+            docsearch = Chroma(
+                persist_directory=knowledge_persistence, 
+                embedding_function=HuggingFaceEmbeddings(model_name='hiiamsid/sentence_similarity_spanish_es'), 
+                client_settings=Settings(anonymized_telemetry=False))
+            docsearch.delete()
+            docsearch.add_documents(documents, ids=[str(index) for index in range(index)])
+            docsearch.persist()
+            print('Saving documents...')
+            with open('documents.txt', 'w', encoding='utf-8') as f:
+                for document in documents:
+                    index = document.metadata['index']
+                    f.write(json.dumps({
+                        'index': index,
+                        'page_content': document.page_content,
+                        'embedding': docsearch.get(index, include=['embeddings'])['embeddings'][0],
+                    }) + '\n')
+            del docsearch
+        
+        from fastchat.serve.inference import generate_stream
 
         logger.info(f"Loading the model {self.model_name} on worker {worker_id} ...")
         self.model, self.tokenizer = load_model(
@@ -404,6 +443,12 @@ if __name__ == "__main__":
     parser.add_argument("--limit-model-concurrency", type=int, default=5)
     parser.add_argument("--stream-interval", type=int, default=2)
     parser.add_argument("--no-register", action="store_true")
+    parser.add_argument(
+        "--read-knowledge", action="store_true", help="Loads previous knowledge base"
+    )
+    parser.add_argument(
+        "--knowledge-dir", type=str, default="fastchat/serve/documents", help="Knowledge base directory"
+    )
     args = parser.parse_args()
     logger.info(f"args: {args}")
 
@@ -426,5 +471,7 @@ if __name__ == "__main__":
         args.max_gpu_memory,
         args.load_8bit,
         args.cpu_offloading,
+        args.read_knowledge,
+        args.knowledge_dir,
     )
     uvicorn.run(app, host=args.host, port=args.port, log_level="info")
