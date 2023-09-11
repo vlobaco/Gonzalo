@@ -17,7 +17,7 @@ class PromptGenerator:
             embedding_function=HuggingFaceEmbeddings(model_name='hiiamsid/sentence_similarity_spanish_es'), 
             client_settings=Settings(anonymized_telemetry=False))
         print('Loading CrossEncoder...')
-        self.cross_encoder = CrossEncoder('cross-encoder/mmarco-mMiniLMv2-L12-H384-v1')
+        self.cross_encoder = CrossEncoder('cross-encoder/ms-marco-MiniLM-L-12-v2')
 
     # Prompt generation
     def _generate_prmopt(self, docs):
